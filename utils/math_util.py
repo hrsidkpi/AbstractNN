@@ -1,5 +1,8 @@
-from shapely.geometry import Point
-from shapely.geometry.polygon import Polygon
+USE_SHAPELY = False
+
+if(USE_SHAPELY):
+    from shapely.geometry import Point
+    from shapely.geometry.polygon import Polygon
 import numpy as np
 
 def point_crosses_segment(point, seg_p1, seg_p2):
@@ -19,10 +22,11 @@ def point_crosses_segment(point, seg_p1, seg_p2):
     return x_hit > 0
     
 
-def point_in_polygon(point, polygon):
-    poly = Polygon([(x,y) for [x,y] in polygon])
-    p = Point(point[0], point[1])
-    return poly.contains(p)
+if(USE_SHAPELY):
+    def point_in_polygon(point, polygon):
+        poly = Polygon([(x,y) for [x,y] in polygon])
+        p = Point(point[0], point[1])
+        return poly.contains(p)
 
 
 def vertices_from_bounds(bounds):
@@ -88,7 +92,7 @@ def find_center(points):
     y = 0
     for p in points:
         x += p[0]
-        y += p[0]
+        y += p[1]
     center = [x / len(points), y / len(points)]
     return center
 
