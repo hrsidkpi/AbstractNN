@@ -32,6 +32,7 @@ class ZonotopeEstimator(object):
 
 
 
+
     def biggest_negative_point_lb(self, i, j):
         all_points = self.get_vertices_with_epsilons()
         closest = None
@@ -68,6 +69,42 @@ class ZonotopeEstimator(object):
                     closest_val = p[0][i]
         return closest
 
+    def smallest_positive_point_lb(self, i, j):
+        all_points = self.get_vertices_with_epsilons()
+        closest = None
+        closest_val = None
+        for p in all_points:
+            if p[0][i] <= 0:
+                continue
+            if p[1][j] >= 0:
+                continue
+            if closest_val == None:
+                closest = p
+                closest_val = p[0][i]
+            else:
+                if p[0][i] < closest_val:
+                    closest = p
+                    closest_val = p[0][i]
+        return closest
+
+    def smallest_positive_point_ub(self, i, j):
+        all_points = self.get_vertices_with_epsilons()
+        closest = None
+        closest_val = None
+        for p in all_points:
+            if p[0][i] <= 0:
+                continue
+            if p[1][j] <= 0:
+                continue
+            if closest_val == None:
+                closest = p
+                closest_val = p[0][i]
+            else:
+                if p[0][i] < closest_val:
+                    closest = p
+                    closest_val = p[0][i]
+        return closest
+
 
     def meet_gt_0(self, i):
         for j in range(len(self.generators)):
@@ -100,34 +137,52 @@ class ZonotopeEstimator(object):
                     continue
                 closest = closest_res[0]
                 dist = closest[i]
-                new_lb = -1 - dist / self.generators[j][i]
                 new_ub = 1 - dist / self.generators[j][i]
                 if(new_ub >= -1):
                     self.change_eps_bounds(j, -1, new_ub)
                     return
-    
-    def apply_relu(self):
-        new_gens = []
-        bias_sum = 0
+
+    def meet_lt_0(self, i):
         for j in range(len(self.generators)):
-            alpha_j = None
-            d_star = None
-            for d in range(len(self.generators[0])):
-                sum_i = 0
-                for i in range(len(self.generators)):
-                    sum_i += abs(self.generators[i][d])
-                t_j_d = self.bias[0][d] + 2 * abs(self.generators[j][d]) - sum_i
-                alpha_j_d = 1 - abs(t_j_d)/2*abs(self.generators[j][d]) if t_j_d > 0 else 1
-                if alpha_j is None or alpha_j_d < alpha_j:
-                    alpha_j = alpha_j_d
-                    d_star = d
-            o_j = self.generators[j][d_star] / abs(self.generators[j][d_star])
-            s_j = -1
-            g_j = alpha_j * self.generators[j]
-            new_gens.append(g_j)
-            bias_sum += s_j * (1-alpha_j) * o_j * g_j
-        self.generators = new_gens
-        self.bias = self.bias + bias_sum
+
+            verts = self.get_vertices_with_epsilons()
+            can_change_ub = True
+            can_change_lb = True
+            for v in verts:
+                if v[0][i] <= 0 and v[1][j] > 0:
+                    can_change_ub = False
+                if v[0][i] <= 0 and v[1][j] < 0:
+                    can_change_lb = False
+            if not (can_change_ub or can_change_lb):
+                continue
+
+            
+            if can_change_lb:
+                closest_res = self.smallest_positive_point_lb(i, j)
+                if closest_res is None:
+                    continue
+                closest = closest_res[0]
+                dist = closest[i]
+                new_lb = -1 - dist / self.generators[j][i]
+                if(new_lb <= 1):
+                    self.change_eps_bounds(j, new_lb, 1)
+                    return
+            if can_change_ub:
+                closest_res = self.smallest_positive_point_ub(i, j)
+                if closest_res is None:
+                    continue
+                closest = closest_res[0]
+                dist = closest[i]
+                new_ub = 1 - dist / self.generators[j][i]
+                if(new_ub >= -1):
+                    self.change_eps_bounds(j, -1, new_ub)
+                    return
+
+
+    def snap_to_0(self, dim: int):
+        for g in self.generators:
+            g[dim] = 0
+        self.bias[dim] = 0
 
     def get_bounds(self):
         bounds = []
@@ -213,6 +268,31 @@ class ZonotopeEstimator(object):
             xs.append(p[0])
             ys.append(p[1])
         plt.scatter(xs, ys)
+
+    def draw_3d(self):
+        xs = []
+        ys = []
+        zs = []
+        epsilons = get_points_in_hypercube(len(self.generators), [[-1, 1] for _ in range(len(self.generators))], 10)
+        for eps in epsilons:
+            p = self.bias
+            for i in range(len(eps)):
+                p = p + np.array(self.generators[i] * eps[i])
+            xs.append(p[0])
+            ys.append(p[1])
+            zs.append(p[2])
+
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d')
+        ax.set_xlabel('X Label')
+        ax.set_ylabel('Y Label')
+        ax.set_zlabel('Z Label')
+
+        xx, yy = np.meshgrid(np.linspace(min(xs) - 1, max(xs) + 1, 10), np.linspace(min(ys) - 1, max(ys) + 1, 10))
+        zz = 0 * xx
+        ax.plot_surface(xx, yy, zz, alpha=0.2)
+
+        ax.scatter(xs, ys, zs)
 
     def draw_lines(self, c='red'):
         vertices = sort_clockwise(self.get_vertices())

@@ -90,10 +90,16 @@ def points_equal(p1, p2):
 def find_center(points):
     x = 0
     y = 0
+    z = 0
     for p in points:
         x += p[0]
         y += p[1]
-    center = [x / len(points), y / len(points)]
+        if len(p) > 2:
+            z += p[2]
+    if len(points[0]) > 2:
+        center = [x / len(points), y / len(points), z / len(points)]
+    else:
+        center = [x / len(points), y / len(points)]
     return center
 
 
